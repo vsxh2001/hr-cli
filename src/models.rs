@@ -42,9 +42,9 @@ pub struct Human {
 
     /// labels associated with the human
     #[arg(long)]
-    pub labels: Option<Vec<String>>,
+    pub label: Option<Vec<String>>,
 
     /// metrics associated with the human
     #[arg(long)]
-    pub metrics: Option<Vec<Metric>>,
+    pub metric: Option<Vec<Metric>>,
 }

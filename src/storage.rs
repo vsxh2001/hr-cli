@@ -10,8 +10,12 @@ pub struct Storage {
 
 impl Storage {
     pub fn new(path: String) -> Storage {
+        let path_buf = PathBuf::from(&path);
+        if !path_buf.exists() {
+            std::fs::create_dir_all(&path_buf).expect("Failed to create directory");
+        }
         Storage {
-            path: PathBuf::from(path),
+            path: path_buf,
         }
     }
 
@@ -31,5 +35,23 @@ impl Storage {
         let file = File::open(file_path)?;
         let human: Human = serde_json::from_reader(file)?;
         Ok(human)
+    }
+
+    pub fn load_all(&self) -> io::Result<Vec<Human>> {
+        let mut humans = Vec::new();
+        for entry in std::fs::read_dir(&self.path)? {
+            let entry = entry?;
+            if entry.path().extension().and_then(|s| s.to_str()) == Some("json") {
+                let human: Human = serde_json::from_reader(File::open(entry.path())?)?;
+                humans.push(human);
+            }
+        }
+        Ok(humans)
+    }
+
+    pub fn remove(&self, name: &str) -> io::Result<()> {
+        let file_path = self.path.join(format!("{}.json", name));
+        std::fs::remove_file(file_path)?;
+        Ok(())
     }
 }

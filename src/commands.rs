@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use crate::models::Human;
+use crate::{models::Human, storage};
 
 
 #[derive(Parser)]
@@ -25,11 +25,22 @@ pub enum Command {
     List,
 }
 
-pub fn run() {
+pub fn run(storage: &storage::Storage) {
     let command = Cli::parse();
     match command.command {
-        Command::Add { human } => println!("Adding {}", human.name),
-        Command::Remove { name } => println!("Removing {}", name),
-        Command::List => println!("Listing"),
+        Command::Add { human } => {
+            storage.save(&human);
+            println!("Adding {}", human.name);
+        }
+        Command::Remove { name } => {
+            storage.remove(&name).unwrap();
+            println!("Removing {}", name);
+        }
+        Command::List => {
+            let humans = storage.load_all().unwrap();
+            for human in humans {
+                println!("Found human: {}", human.name);
+            }
+        }
     }
 }
