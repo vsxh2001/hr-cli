@@ -55,3 +55,46 @@ impl Storage {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{Human, Metric};
+    use tempfile::tempdir;
+
+    #[test]
+    fn save_load_remove_roundtrip() {
+        let tmp = tempdir().expect("tempdir");
+        let storage = Storage::new(tmp.path().to_string_lossy().to_string());
+
+        let human = Human {
+            id: Some("123".into()),
+            name: "Jane".into(),
+            phone: Some("555-0100".into()),
+            label: Some(vec!["eng".into(), "team-a".into()]),
+            metric: Some(vec![
+                Metric { name: "speed".into(), value: 7 },
+                Metric { name: "height".into(), value: 42 },
+            ]),
+        };
+
+        storage.save(&human);
+
+        // load by name
+        let loaded = storage.load("Jane").expect("load");
+        assert_eq!(loaded.name, "Jane");
+        assert_eq!(loaded.id.as_deref(), Some("123"));
+        assert_eq!(loaded.phone.as_deref(), Some("555-0100"));
+        assert_eq!(loaded.label.as_ref().unwrap().len(), 2);
+        assert_eq!(loaded.metric.as_ref().unwrap().len(), 2);
+
+        // load_all contains Jane
+        let all = storage.load_all().expect("load_all");
+        assert!(all.iter().any(|h| h.name == "Jane"));
+
+        // remove and ensure gone
+        storage.remove("Jane").expect("remove");
+        let err = storage.load("Jane").unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::NotFound);
+    }
+}

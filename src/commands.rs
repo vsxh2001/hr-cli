@@ -44,3 +44,49 @@ pub fn run(storage: &storage::Storage) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_add_minimal() {
+        let cli = Cli::try_parse_from(["hr", "add", "--name", "Alice"]).expect("parse");
+        match cli.command {
+            Command::Add { human } => {
+                assert_eq!(human.name, "Alice");
+                assert!(human.id.is_none());
+                assert!(human.phone.is_none());
+                assert!(human.label.is_none());
+                assert!(human.metric.is_none());
+            }
+            _ => panic!("expected Add"),
+        }
+    }
+
+    #[test]
+    fn parse_add_with_labels_and_metrics() {
+        let cli = Cli::try_parse_from([
+            "hr", "add",
+            "--name", "Bob",
+            "--label", "eng",
+            "--label", "oncall",
+            "--metric", "speed:10",
+            "--metric", "height:20",
+        ]).expect("parse");
+
+        match cli.command {
+            Command::Add { human } => {
+                let labels = human.label.expect("labels");
+                assert_eq!(labels, vec!["eng".to_string(), "oncall".to_string()]);
+                let metrics = human.metric.expect("metrics");
+                assert_eq!(metrics.len(), 2);
+                assert_eq!(metrics[0].name, "speed");
+                assert_eq!(metrics[0].value, 10);
+                assert_eq!(metrics[1].name, "height");
+                assert_eq!(metrics[1].value, 20);
+            }
+            _ => panic!("expected Add"),
+        }
+    }
+}

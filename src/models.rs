@@ -45,6 +45,30 @@ pub struct Human {
     pub label: Option<Vec<String>>,
 
     /// metrics associated with the human
-    #[arg(long)]
+    #[arg(long, value_parser = clap::value_parser!(Metric))]
     pub metric: Option<Vec<Metric>>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn metric_from_str_valid() {
+        let m: Metric = "speed:42".parse().expect("parse Metric");
+        assert_eq!(m.name, "speed");
+        assert_eq!(m.value, 42);
+    }
+
+    #[test]
+    fn metric_from_str_invalid_format() {
+        let err = "speed-42".parse::<Metric>().unwrap_err();
+        assert!(err.contains("Invalid format"));
+    }
+
+    #[test]
+    fn metric_from_str_invalid_value() {
+        let err = "speed:NaN".parse::<Metric>().unwrap_err();
+        assert!(err.contains("valid number"));
+    }
 }
