@@ -1,26 +1,38 @@
 use crate::models::{Human, Metric};
 use crate::storage::Storage;
-use regex::Regex;
 use std::collections::HashMap;
 use std::io;
+use regex::Regex;
 
-/// Build an optional regex from pattern; empty string -> None.
-pub fn build_name_regex(pattern: &str) -> io::Result<Option<Regex>> {
-    if pattern.is_empty() {
-        return Ok(None);
+/// Normalize an optional pattern: None or empty -> None, else Some(pattern.clone()).
+pub fn normalize_pattern(pat: &Option<String>) -> Option<String> {
+    match pat.as_deref() {
+        None | Some("") => None,
+        Some(s) => Some(s.to_string()),
     }
-    Regex::new(pattern)
-        .map(Some)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))
 }
 
-/// Build an optional description regex from Option pattern; None or empty -> None.
-pub fn build_description_regex(pattern: &Option<String>) -> io::Result<Option<Regex>> {
-    match pattern.as_deref() {
-        None | Some("") => Ok(None),
-        Some(s) => Regex::new(s)
-            .map(Some)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e)),
+/// Convert a simple wildcard pattern to an anchored regex string.
+fn wildcard_to_regex(pattern: &str) -> String {
+    let mut re = String::with_capacity(pattern.len() * 2 + 2);
+    re.push('^');
+    for ch in pattern.chars() {
+        match ch {
+            '*' => re.push_str(".*"),
+            '?' => re.push('.'),
+            _ => re.push_str(&regex::escape(&ch.to_string())),
+        }
+    }
+    re.push('$');
+    re
+}
+
+/// Simple wildcard matching supporting '*' (any sequence) and '?' (single char), implemented via regex.
+pub fn wildcard_matches(pattern: &str, text: &str) -> bool {
+    let re = wildcard_to_regex(pattern);
+    match Regex::new(&re) {
+        Ok(r) => r.is_match(text),
+        Err(_) => false,
     }
 }
 
@@ -48,10 +60,10 @@ pub fn metrics_meet(candidate: &Human, minimums: &HashMap<String, u8>) -> bool {
     minimums.iter().all(|(k, min_v)| have.get(k).map_or(false, |v| v >= min_v))
 }
 
-/// Check if a human matches all query-derived filters.
-pub fn human_matches(h: &Human, name_re: &Option<Regex>, required_labels: &[String], min_metrics: &HashMap<String, u8>) -> bool {
-    if let Some(re) = name_re {
-        if !re.is_match(&h.name) {
+/// Check if a human matches all query-derived filters (name wildcard, labels, metrics).
+pub fn human_matches(h: &Human, name_pat: &Option<String>, required_labels: &[String], min_metrics: &HashMap<String, u8>) -> bool {
+    if let Some(pat) = name_pat {
+        if !wildcard_matches(pat, &h.name) {
             return false;
         }
     }
@@ -64,14 +76,14 @@ pub fn human_matches(h: &Human, name_re: &Option<Regex>, required_labels: &[Stri
     true
 }
 
-/// Return true if description matches provided regex (or if no regex provided).
-pub fn description_matches(h: &Human, desc_re: &Option<Regex>) -> bool {
-    match desc_re {
+/// Return true if description matches provided wildcard pattern (or if not provided).
+pub fn description_matches(h: &Human, desc_pat: &Option<String>) -> bool {
+    match desc_pat {
         None => true,
-        Some(re) => h
+        Some(pat) => h
             .description
             .as_deref()
-            .map(|d| re.is_match(d))
+            .map(|d| wildcard_matches(pat, d))
             .unwrap_or(false),
     }
 }
@@ -90,15 +102,15 @@ pub fn extract_min_metrics(query: &Human) -> HashMap<String, u8> {
 /// Search: load all humans and filter according to query.
 pub fn run(storage: &Storage, query: &Human) -> io::Result<Vec<Human>> {
     let all = storage.load_all()?;
-    let name_regex = build_name_regex(&query.name)?;
-    let desc_regex = build_description_regex(&query.description)?;
+    let name_pat = if query.name.is_empty() { None } else { Some(query.name.clone()) };
+    let desc_pat = normalize_pattern(&query.description);
     let required_labels = query.label.clone().unwrap_or_default();
     let min_metrics = extract_min_metrics(query);
 
     let results = all
         .into_iter()
-        .filter(|h| human_matches(h, &name_regex, &required_labels, &min_metrics))
-        .filter(|h| description_matches(h, &desc_regex))
+        .filter(|h| human_matches(h, &name_pat, &required_labels, &min_metrics))
+        .filter(|h| description_matches(h, &desc_pat))
         .collect();
     Ok(results)
 }
@@ -133,7 +145,7 @@ mod tests {
     }
 
     #[test]
-    fn search_by_regex_labels_and_metrics() {
+    fn search_by_wildcards_labels_and_metrics() {
         let tmp = tempdir().unwrap();
         let storage = Storage::new(tmp.path().to_string_lossy().to_string());
 
@@ -145,10 +157,10 @@ mod tests {
         storage.save(&b);
         storage.save(&c);
 
-        // Query: name /ali.*/, labels must contain [eng], metrics speed >= 10
+        // Query: name ali*, labels must contain [eng], metrics speed >= 10
         let query = Human {
             id: None,
-            name: String::from("^ali"),
+            name: String::from("ali*"),
             phone: None,
             description: None,
             label: Some(vec!["eng".into()]),
@@ -162,7 +174,7 @@ mod tests {
     }
 
     #[test]
-    fn search_by_description_regex() {
+    fn search_by_description_wildcard() {
         let tmp = tempdir().unwrap();
         let storage = Storage::new(tmp.path().to_string_lossy().to_string());
 
@@ -175,9 +187,9 @@ mod tests {
 
         let query = Human {
             id: None,
-            name: String::from(""),
+            name: String::from("*"),
             phone: None,
-            description: Some("lead$".into()),
+            description: Some("*lead".into()),
             label: None,
             metric: None,
         };

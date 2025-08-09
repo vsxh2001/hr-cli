@@ -58,13 +58,13 @@ fn e2e_add_list_search_remove() {
             predicate::str::contains("Found human: alice").and(predicate::str::contains("Found human: alina")),
         );
 
-    // search by regex + label + metric threshold
+    // search by wildcard + label + metric threshold
     bin()
         .env("HR_STORAGE_PATH", &storage_root)
         .args([
             "search",
             "--name",
-            "^ali",
+            "ali*",
             "--label",
             "eng",
             "--metric",
