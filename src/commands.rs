@@ -74,6 +74,7 @@ mod tests {
                 assert_eq!(human.name, "Alice");
                 assert!(human.id.is_none());
                 assert!(human.phone.is_none());
+                assert!(human.description.is_none());
                 assert!(human.label.is_none());
                 assert!(human.metric.is_none());
             }

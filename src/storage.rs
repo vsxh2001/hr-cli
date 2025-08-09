@@ -71,6 +71,7 @@ mod tests {
             id: Some("123".into()),
             name: "Jane".into(),
             phone: Some("555-0100".into()),
+            description: Some("A description".into()),
             label: Some(vec!["eng".into(), "team-a".into()]),
             metric: Some(vec![
                 Metric { name: "speed".into(), value: 7 },
@@ -85,6 +86,7 @@ mod tests {
         assert_eq!(loaded.name, "Jane");
         assert_eq!(loaded.id.as_deref(), Some("123"));
         assert_eq!(loaded.phone.as_deref(), Some("555-0100"));
+    assert_eq!(loaded.description.as_deref(), Some("A description"));
         assert_eq!(loaded.label.as_ref().unwrap().len(), 2);
         assert_eq!(loaded.metric.as_ref().unwrap().len(), 2);
 

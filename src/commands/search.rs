@@ -14,6 +14,16 @@ pub fn build_name_regex(pattern: &str) -> io::Result<Option<Regex>> {
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))
 }
 
+/// Build an optional description regex from Option pattern; None or empty -> None.
+pub fn build_description_regex(pattern: &Option<String>) -> io::Result<Option<Regex>> {
+    match pattern.as_deref() {
+        None | Some("") => Ok(None),
+        Some(s) => Regex::new(s)
+            .map(Some)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e)),
+    }
+}
+
 /// Return true if candidate contains all required labels.
 pub fn labels_match(candidate: &Human, required: &[String]) -> bool {
     if required.is_empty() {
@@ -54,6 +64,18 @@ pub fn human_matches(h: &Human, name_re: &Option<Regex>, required_labels: &[Stri
     true
 }
 
+/// Return true if description matches provided regex (or if no regex provided).
+pub fn description_matches(h: &Human, desc_re: &Option<Regex>) -> bool {
+    match desc_re {
+        None => true,
+        Some(re) => h
+            .description
+            .as_deref()
+            .map(|d| re.is_match(d))
+            .unwrap_or(false),
+    }
+}
+
 /// Extract thresholds map from a query Human's metrics.
 pub fn extract_min_metrics(query: &Human) -> HashMap<String, u8> {
     query
@@ -69,12 +91,14 @@ pub fn extract_min_metrics(query: &Human) -> HashMap<String, u8> {
 pub fn run(storage: &Storage, query: &Human) -> io::Result<Vec<Human>> {
     let all = storage.load_all()?;
     let name_regex = build_name_regex(&query.name)?;
+    let desc_regex = build_description_regex(&query.description)?;
     let required_labels = query.label.clone().unwrap_or_default();
     let min_metrics = extract_min_metrics(query);
 
     let results = all
         .into_iter()
         .filter(|h| human_matches(h, &name_regex, &required_labels, &min_metrics))
+        .filter(|h| description_matches(h, &desc_regex))
         .collect();
     Ok(results)
 }
@@ -89,6 +113,7 @@ mod tests {
             id: None,
             name: name.to_string(),
             phone: None,
+            description: None,
             label: if labels.is_empty() {
                 None
             } else {
@@ -125,6 +150,7 @@ mod tests {
             id: None,
             name: String::from("^ali"),
             phone: None,
+            description: None,
             label: Some(vec!["eng".into()]),
             metric: Some(vec![Metric { name: "speed".into(), value: 10 }]),
         };
@@ -133,5 +159,31 @@ mod tests {
         let names: Vec<String> = results.into_iter().map(|h| h.name).collect();
         // alice (speed=10, eng,oncall) and alina (speed=11, eng) match; bob doesn't.
         assert_eq!(names, vec!["alice", "alina"]);
+    }
+
+    #[test]
+    fn search_by_description_regex() {
+        let tmp = tempdir().unwrap();
+        let storage = Storage::new(tmp.path().to_string_lossy().to_string());
+
+        let mut a = mk_human("alice", &[], &[]);
+        a.description = Some("team lead".into());
+        let mut b = mk_human("alina", &[], &[]);
+        b.description = Some("intern".into());
+        storage.save(&a);
+        storage.save(&b);
+
+        let query = Human {
+            id: None,
+            name: String::from(""),
+            phone: None,
+            description: Some("lead$".into()),
+            label: None,
+            metric: None,
+        };
+
+        let results = run(&storage, &query).unwrap();
+        let names: Vec<String> = results.into_iter().map(|h| h.name).collect();
+        assert_eq!(names, vec!["alice"]);
     }
 }

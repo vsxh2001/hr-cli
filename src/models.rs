@@ -40,6 +40,10 @@ pub struct Human {
     #[arg(long)]
     pub phone: Option<String>,
 
+    /// free-form description of the human
+    #[arg(short, long)]
+    pub description: Option<String>,
+
     /// labels associated with the human
     #[arg(long)]
     pub label: Option<Vec<String>>,
