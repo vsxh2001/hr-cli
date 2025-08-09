@@ -1,6 +1,8 @@
 use clap::{Parser, Subcommand};
 use crate::{models::Human, storage};
 
+pub mod search;
+
 
 #[derive(Parser)]
 #[command(name = "hr", about = "Human Resource CLI", long_about = None)]
@@ -23,6 +25,11 @@ pub enum Command {
     },
     /// List all humans
     List,
+    /// Search humans by regex name, must-have labels, and minimal metrics
+    Search {
+        #[command(flatten)]
+        human: Human,
+    },
 }
 
 pub fn run(storage: &storage::Storage) {
@@ -40,6 +47,16 @@ pub fn run(storage: &storage::Storage) {
             let humans = storage.load_all().unwrap();
             for human in humans {
                 println!("Found human: {}", human.name);
+            }
+        }
+        Command::Search { human } => {
+            match search::run(storage, &human) {
+                Ok(results) => {
+                    for h in results {
+                        println!("Found human: {}", h.name);
+                    }
+                }
+                Err(e) => eprintln!("Search failed: {}", e),
             }
         }
     }
