@@ -76,3 +76,37 @@ mod tests {
         assert!(err.contains("valid number"));
     }
 }
+
+// Test fixtures shared across unit tests in this crate
+#[cfg(test)]
+pub mod humans {
+    use super::{Human, Metric};
+
+    fn mk(name: &str, labels: &[&str], metrics: &[(&str, u8)], description: Option<&str>, id: Option<&str>, phone: Option<&str>) -> Human {
+        Human {
+            id: id.map(|s| s.to_string()),
+            name: name.to_string(),
+            phone: phone.map(|s| s.to_string()),
+            description: description.map(|s| s.to_string()),
+            label: if labels.is_empty() { None } else { Some(labels.iter().map(|s| s.to_string()).collect()) },
+            metric: if metrics.is_empty() {
+                None
+            } else {
+                Some(metrics.iter().map(|(n, v)| Metric { name: (*n).into(), value: *v }).collect())
+            },
+        }
+    }
+
+    /// Create a small, reusable set of Humans for tests.
+    /// Contains: Jane (with id/phone/description), alice (eng,oncall), alina (eng), bob (sales)
+    pub fn test_setup() -> Vec<Human> {
+        vec![
+            // Matches storage roundtrip expectations
+            mk("Jane", &["eng", "team-a"], &[("speed", 7), ("height", 42)], Some("A description"), Some("123"), Some("555-0100")),
+            // Used by search tests
+            mk("alice", &["eng", "oncall"], &[("speed", 10), ("height", 20)], Some("team lead"), None, Some("555")),
+            mk("alina", &["eng"], &[("speed", 11), ("height", 20)], None, None, None),
+            mk("bob", &["sales"], &[("speed", 9)], Some("intern"), None, None),
+        ]
+    }
+}

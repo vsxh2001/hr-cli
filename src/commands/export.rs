@@ -14,7 +14,9 @@ fn humans_to_dataframe(humans: &[Human]) -> PolarsResult<DataFrame> {
     }
 
     let cursor = std::io::Cursor::new(buf);
-    JsonReader::new(cursor).finish()
+    JsonReader::new(cursor)
+        .with_json_format(JsonFormat::JsonLines)
+        .finish()
 }
 
 pub fn run(storage: &Storage, output: Option<&str>) -> io::Result<()> {
@@ -47,23 +49,16 @@ fn to_io_err<E: std::error::Error + Send + Sync + 'static>(e: E) -> io::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::Metric;
+    use crate::models::humans::test_setup;
     use tempfile::tempdir;
 
     #[test]
     fn export_to_csv_stdout() {
         let tmp = tempdir().unwrap();
         let storage = Storage::new(tmp.path().to_string_lossy().to_string());
-
-        let h = Human {
-            id: Some("1".into()),
-            name: "alice".into(),
-            phone: Some("555".into()),
-            description: Some("team lead".into()),
-            label: Some(vec!["eng".into(), "oncall".into()]),
-            metric: Some(vec![Metric { name: "speed".into(), value: 10 }]),
-        };
-        storage.save(&h);
+        for h in test_setup().into_iter().filter(|h| matches!(h.name.as_str(), "alice"|"bob")) {
+            storage.save(&h);
+        }
 
         // Create a dataframe to ensure no panics in conversion
         let df = humans_to_dataframe(&storage.load_all().unwrap()).unwrap();

@@ -59,7 +59,7 @@ impl Storage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{Human, Metric};
+    use crate::models::humans::test_setup;
     use tempfile::tempdir;
 
     #[test]
@@ -67,17 +67,7 @@ mod tests {
         let tmp = tempdir().expect("tempdir");
         let storage = Storage::new(tmp.path().to_string_lossy().to_string());
 
-        let human = Human {
-            id: Some("123".into()),
-            name: "Jane".into(),
-            phone: Some("555-0100".into()),
-            description: Some("A description".into()),
-            label: Some(vec!["eng".into(), "team-a".into()]),
-            metric: Some(vec![
-                Metric { name: "speed".into(), value: 7 },
-                Metric { name: "height".into(), value: 42 },
-            ]),
-        };
+    let human = test_setup().into_iter().find(|h| h.name == "Jane").unwrap();
 
         storage.save(&human);
 
@@ -91,8 +81,8 @@ mod tests {
         assert_eq!(loaded.metric.as_ref().unwrap().len(), 2);
 
         // load_all contains Jane
-        let all = storage.load_all().expect("load_all");
-        assert!(all.iter().any(|h| h.name == "Jane"));
+    let all = storage.load_all().expect("load_all");
+    assert!(all.iter().any(|h| h.name == "Jane"));
 
         // remove and ensure gone
         storage.remove("Jane").expect("remove");

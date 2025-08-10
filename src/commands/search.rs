@@ -119,43 +119,15 @@ pub fn run(storage: &Storage, query: &Human) -> io::Result<Vec<Human>> {
 mod tests {
     use super::*;
     use tempfile::tempdir;
-
-    fn mk_human(name: &str, labels: &[&str], metrics: &[(&str, u8)]) -> Human {
-        Human {
-            id: None,
-            name: name.to_string(),
-            phone: None,
-            description: None,
-            label: if labels.is_empty() {
-                None
-            } else {
-                Some(labels.iter().map(|s| s.to_string()).collect())
-            },
-            metric: if metrics.is_empty() {
-                None
-            } else {
-                Some(
-                    metrics
-                        .iter()
-                        .map(|(n, v)| Metric { name: (*n).into(), value: *v })
-                        .collect(),
-                )
-            },
-        }
-    }
+    use crate::models::humans::test_setup;
 
     #[test]
     fn search_by_wildcards_labels_and_metrics() {
         let tmp = tempdir().unwrap();
         let storage = Storage::new(tmp.path().to_string_lossy().to_string());
-
-        let a = mk_human("alice", &["eng", "oncall"], &[("speed", 10), ("height", 20)]);
-        let b = mk_human("bob", &["sales"], &[("speed", 9)]);
-        let c = mk_human("alina", &["eng"], &[("speed", 11), ("height", 20)]);
-
-        storage.save(&a);
-        storage.save(&b);
-        storage.save(&c);
+        for h in test_setup().into_iter().filter(|h| matches!(h.name.as_str(), "alice"|"bob"|"alina")) {
+            storage.save(&h);
+        }
 
         // Query: name ali*, labels must contain [eng], metrics speed >= 10
         let query = Human {
@@ -177,13 +149,9 @@ mod tests {
     fn search_by_description_wildcard() {
         let tmp = tempdir().unwrap();
         let storage = Storage::new(tmp.path().to_string_lossy().to_string());
-
-        let mut a = mk_human("alice", &[], &[]);
-        a.description = Some("team lead".into());
-        let mut b = mk_human("alina", &[], &[]);
-        b.description = Some("intern".into());
-        storage.save(&a);
-        storage.save(&b);
+        for h in test_setup().into_iter().filter(|h| matches!(h.name.as_str(), "alice"|"alina")) {
+            storage.save(&h);
+        }
 
         let query = Human {
             id: None,
