@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 use crate::{models::Human, storage};
 
 pub mod search;
-pub mod export;
+// export feature removed
 
 
 #[derive(Parser)]
@@ -31,12 +31,6 @@ pub enum Command {
         #[command(flatten)]
         human: Human,
     },
-    /// Export humans as CSV (to stdout or to --output file)
-    Export {
-        /// Output file path. If omitted, writes to stdout.
-        #[arg(long)]
-        output: Option<String>,
-    },
 }
 
 pub fn run(storage: &storage::Storage) {
@@ -64,11 +58,6 @@ pub fn run(storage: &storage::Storage) {
                     }
                 }
                 Err(e) => eprintln!("Search failed: {}", e),
-            }
-        }
-        Command::Export { output } => {
-            if let Err(e) = export::run(storage, output.as_deref()) {
-                eprintln!("Export failed: {}", e);
             }
         }
     }
